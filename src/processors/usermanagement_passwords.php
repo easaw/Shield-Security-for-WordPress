@@ -13,7 +13,7 @@ require_once( dirname( __FILE__ ).'/base_wpsf.php' );
 class ICWP_WPSF_Processor_UserManagement_Passwords extends ICWP_WPSF_Processor_BaseWpsf {
 
 	public function run() {
-		/* add_action( 'password_reset', array( $this, 'onPasswordReset' ), 100, 1 ); really needed? */
+		add_action( 'password_reset', array( $this, 'onPasswordReset' ), 100, 1 );
 		add_filter( 'registration_errors', array( $this, 'checkPassword' ), 100, 3 );
 		add_action( 'user_profile_update_errors', array( $this, 'checkPassword' ), 100, 3 );
 		add_action( 'validate_password_reset', array( $this, 'checkPassword' ), 100, 3 );
@@ -62,7 +62,7 @@ class ICWP_WPSF_Processor_UserManagement_Passwords extends ICWP_WPSF_Processor_B
 	}
 
 	public function onWpLoaded() {
-		if ( !$this->loadRequest()->isMethodPost() && $this->loadWpUsers()->isUserLoggedIn() ) {
+		if ( is_admin() && !$this->loadRequest()->isMethodPost() && $this->loadWpUsers()->isUserLoggedIn() ) {
 			$this->processExpiredPassword();
 			$this->processFailedCheckPassword();
 		}
@@ -81,7 +81,6 @@ class ICWP_WPSF_Processor_UserManagement_Passwords extends ICWP_WPSF_Processor_B
 	}
 
 	/**
-	 * Really Needed?
 	 * @param WP_User $oUser
 	 */
 	public function onPasswordReset( $oUser ) {
@@ -95,14 +94,14 @@ class ICWP_WPSF_Processor_UserManagement_Passwords extends ICWP_WPSF_Processor_B
 	private function processExpiredPassword() {
 		/** @var ICWP_WPSF_FeatureHandler_UserManagement $oFO */
 		$oFO = $this->getMod();
-		$oMeta = $this->getController()->getCurrentUserMeta();
-
+		$nPassStartedAt = (int)$this->getController()->getCurrentUserMeta()->pass_started_at;
 		$nExpireTimeout = $oFO->getPassExpireTimeout();
-		if ( $nExpireTimeout > 0 && $oMeta->pass_started_at > 0 ) {
-			if ( $this->time() - $oMeta->pass_started_at > $nExpireTimeout ) {
+
+		if ( $nExpireTimeout > 0 && $nPassStartedAt > 0 ) {
+			if ( $this->time() - $nPassStartedAt > $nExpireTimeout ) {
 				$this->addToAuditEntry( _wpsf__( 'Forcing user to update expired password.' ) );
 				$this->redirectToResetPassword(
-					sprintf( _wpsf__( 'Your password has expired (%s days).' ), $oFO->getPassExpireDays() )
+					sprintf( _wpsf__( 'Your password has expired (after %s days).' ), $oFO->getPassExpireDays() )
 				);
 			}
 		}
@@ -154,7 +153,7 @@ class ICWP_WPSF_Processor_UserManagement_Passwords extends ICWP_WPSF_Processor_B
 
 		$oMeta = $this->getCurrentUserMeta();
 		$nLastRedirect = (int)$oMeta->pass_reset_last_redirect_at;
-		if ( $this->time() - $nLastRedirect > MINUTE_IN_SECONDS * 2 ) {
+		if ( $this->time() - $nLastRedirect > MINUTE_IN_SECONDS*2 ) {
 
 			$oMeta->pass_reset_last_redirect_at = $this->time();
 
